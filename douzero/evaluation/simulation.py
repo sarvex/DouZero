@@ -28,7 +28,7 @@ def mp_simulate(card_play_data_list, card_play_model_path_dict):
     players = load_card_play_models(card_play_model_path_dict)
 
     env = GameEnv(players)
-    for idx, card_play_data in enumerate(card_play_data_list):
+    for card_play_data in card_play_data_list:
         env.card_play_init(card_play_data)
         while not env.game_over:
             env.step()
@@ -47,7 +47,7 @@ def mp_simulate(card_play_data_list, card_play_model_path_dict):
         num_farmer_scores.value += env.num_scores['farmer']
 
 def data_allocation_per_worker(card_play_data_list, num_workers):
-    card_play_data_list_each_worker = [[] for k in range(num_workers)]
+    card_play_data_list_each_worker = [[] for _ in range(num_workers)]
     for idx, data in enumerate(card_play_data_list):
         card_play_data_list_each_worker[idx % num_workers].append(data)
 
@@ -76,6 +76,10 @@ def evaluate(landlord, landlord_up, landlord_down, eval_data, num_workers):
     results = [p.get() for p in results]
     num_total_wins = num_landlord_wins.value + num_farmer_wins.value
     print('WP results:')
-    print('landlord : Farmers - {} : {}'.format(num_landlord_wins.value / num_total_wins, num_farmer_wins.value / num_total_wins))
+    print(
+        f'landlord : Farmers - {num_landlord_wins.value / num_total_wins} : {num_farmer_wins.value / num_total_wins}'
+    )
     print('ADP results:')
-    print('landlord : Farmers - {} : {}'.format(num_landlord_scores.value / num_total_wins, 2 * num_farmer_scores.value / num_total_wins)) 
+    print(
+        f'landlord : Farmers - {num_landlord_scores.value / num_total_wins} : {2 * num_farmer_scores.value / num_total_wins}'
+    ) 

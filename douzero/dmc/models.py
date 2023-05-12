@@ -36,12 +36,14 @@ class LandlordLstmModel(nn.Module):
         x = self.dense6(x)
         if return_value:
             return dict(values=x)
-        else:
-            if flags is not None and flags.exp_epsilon > 0 and np.random.rand() < flags.exp_epsilon:
-                action = torch.randint(x.shape[0], (1,))[0]
-            else:
-                action = torch.argmax(x,dim=0)[0]
-            return dict(action=action)
+        action = (
+            torch.randint(x.shape[0], (1,))[0]
+            if flags is not None
+            and flags.exp_epsilon > 0
+            and np.random.rand() < flags.exp_epsilon
+            else torch.argmax(x, dim=0)[0]
+        )
+        return dict(action=action)
 
 class FarmerLstmModel(nn.Module):
     def __init__(self):
@@ -71,18 +73,21 @@ class FarmerLstmModel(nn.Module):
         x = self.dense6(x)
         if return_value:
             return dict(values=x)
-        else:
-            if flags is not None and flags.exp_epsilon > 0 and np.random.rand() < flags.exp_epsilon:
-                action = torch.randint(x.shape[0], (1,))[0]
-            else:
-                action = torch.argmax(x,dim=0)[0]
-            return dict(action=action)
+        action = (
+            torch.randint(x.shape[0], (1,))[0]
+            if flags is not None
+            and flags.exp_epsilon > 0
+            and np.random.rand() < flags.exp_epsilon
+            else torch.argmax(x, dim=0)[0]
+        )
+        return dict(action=action)
 
 # Model dict is only used in evaluation but not training
-model_dict = {}
-model_dict['landlord'] = LandlordLstmModel
-model_dict['landlord_up'] = FarmerLstmModel
-model_dict['landlord_down'] = FarmerLstmModel
+model_dict = {
+    'landlord': LandlordLstmModel,
+    'landlord_up': FarmerLstmModel,
+    'landlord_down': FarmerLstmModel,
+}
 
 class Model:
     """
@@ -90,10 +95,15 @@ class Model:
     interfaces such as share_memory, eval, etc.
     """
     def __init__(self, device=0):
-        self.models = {}
-        self.models['landlord'] = LandlordLstmModel().to(torch.device('cuda:'+str(device)))
-        self.models['landlord_up'] = FarmerLstmModel().to(torch.device('cuda:'+str(device)))
-        self.models['landlord_down'] = FarmerLstmModel().to(torch.device('cuda:'+str(device)))
+        self.models = {
+            'landlord': LandlordLstmModel().to(torch.device(f'cuda:{str(device)}'))
+        }
+        self.models['landlord_up'] = FarmerLstmModel().to(
+            torch.device(f'cuda:{str(device)}')
+        )
+        self.models['landlord_down'] = FarmerLstmModel().to(
+            torch.device(f'cuda:{str(device)}')
+        )
 
     def forward(self, position, z, x, training=False, flags=None):
         model = self.models[position]

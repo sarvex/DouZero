@@ -16,8 +16,7 @@ from .utils import get_batch, log, create_env, create_buffers, create_optimizers
 mean_episode_return_buf = {p:deque(maxlen=100) for p in ['landlord', 'landlord_up', 'landlord_down']}
 
 def compute_loss(logits, targets):
-    loss = ((logits.squeeze(-1) - targets)**2).mean()
-    return loss
+    return ((logits.squeeze(-1) - targets)**2).mean()
 
 def learn(position,
           actor_models,
@@ -27,7 +26,7 @@ def learn(position,
           flags,
           lock):
     """Performs a learning (optimization) step."""
-    device = torch.device('cuda:'+str(flags.training_device)) 
+    device = torch.device(f'cuda:{str(flags.training_device)}')
     obs_x_no_action = batch['obs_x_no_action'].to(device)
     obs_action = batch['obs_action'].to(device)
     obs_x = torch.cat((obs_x_no_action, obs_action), dim=2).float()
@@ -36,15 +35,17 @@ def learn(position,
     target = torch.flatten(batch['target'].to(device), 0, 1)
     episode_returns = batch['episode_return'][batch['done']]
     mean_episode_return_buf[position].append(torch.mean(episode_returns).to(device))
-        
+
     with lock:
         learner_outputs = model(obs_z, obs_x, return_value=True)
         loss = compute_loss(learner_outputs['values'], target)
         stats = {
-            'mean_episode_return_'+position: torch.mean(torch.stack([_r for _r in mean_episode_return_buf[position]])).item(),
-            'loss_'+position: loss.item(),
+            f'mean_episode_return_{position}': torch.mean(
+                torch.stack(list(mean_episode_return_buf[position]))
+            ).item(),
+            f'loss_{position}': loss.item(),
         }
-        
+
         optimizer.zero_grad()
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), flags.max_grad_norm)
@@ -54,7 +55,7 @@ def learn(position,
             actor_model.get_model(position).load_state_dict(model.state_dict())
         return stats
 
-def train(flags):  
+def train(flags):
     """
     This is the main funtion for training. It will first
     initilize everything, such as buffers, optimizers, etc.
@@ -67,7 +68,8 @@ def train(flags):
         rootdir=flags.savedir,
     )
     checkpointpath = os.path.expandvars(
-        os.path.expanduser('%s/%s/%s' % (flags.savedir, flags.xpid, 'model.tar')))
+        os.path.expanduser(f'{flags.savedir}/{flags.xpid}/model.tar')
+    )
 
     T = flags.unroll_length
     B = flags.batch_size
@@ -83,7 +85,7 @@ def train(flags):
 
     # Initialize buffers
     buffers = create_buffers(flags)
-   
+
     # Initialize queues
     actor_processes = []
     ctx = mp.get_context('spawn')
@@ -116,7 +118,7 @@ def train(flags):
     # Load models if any
     if flags.load_model and os.path.exists(checkpointpath):
         checkpoint_states = torch.load(
-                checkpointpath, map_location="cuda:"+str(flags.training_device)
+            checkpointpath, map_location=f"cuda:{str(flags.training_device)}"
         )
         for k in ['landlord', 'landlord_up', 'landlord_down']:
             learner_model.get_model(k).load_state_dict(checkpoint_states["model_state_dict"][k])
@@ -172,7 +174,7 @@ def train(flags):
                     target=batch_and_learn, name='batch-and-learn-%d' % i, args=(i,device,position,locks[device][position],position_locks[position]))
                 thread.start()
                 threads.append(thread)
-    
+
     def checkpoint(frames):
         if flags.disable_checkpoint:
             return
@@ -189,8 +191,11 @@ def train(flags):
 
         # Save the weights for evaluation purpose
         for position in ['landlord', 'landlord_up', 'landlord_down']:
-            model_weights_dir = os.path.expandvars(os.path.expanduser(
-                '%s/%s/%s' % (flags.savedir, flags.xpid, position+'_weights_'+str(frames)+'.ckpt')))
+            model_weights_dir = os.path.expandvars(
+                os.path.expanduser(
+                    f'{flags.savedir}/{flags.xpid}/{position}_weights_{str(frames)}.ckpt'
+                )
+            )
             torch.save(learner_model.get_model(position).state_dict(), model_weights_dir)
 
     timer = timeit.default_timer
