@@ -1,4 +1,4 @@
-torch>=1.6.0
+torch>=2.11.0
 GitPython
 gitdb2
 rlcard
